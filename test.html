@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+<style>
+    table {
+        border: 1px solid silver;
+        border-collapse: collapse;
+    }
+
+    td, th{
+        padding: 0px 20px 0px 20px;
+    }
+
+    #table--content{
+        height: 500px;
+        overflow: auto;
+        width: fit-content;
+    }
+    #table--content thead{
+        position: sticky;
+        top:0;
+        background-color: gray;
+    }
+    /* 
+    table thead th{
+        border-bottom: 1px solid black;
+    }
+    
+    td{
+        padding : 20px;
+        border-left: 1px solid black;
+        border-bottom: 1px solid black;
+    }
+
+    tr td:first-child{
+        border-left:none;
+    } */
+</style>
+<body>
+    <!-- <input id="clipboard">
+    <button id="clipboardBtn">Click me</button> -->
+    <table id="" border="">
+        <thead>
+            <th>th</th>
+            <th>th2</th>
+            <th>th3</th>
+            <th>th4</th>
+        </thead>
+        <tbody>
+            <tr>
+                <td>1</td>
+                <td>2</td>
+                <td>3</td>
+                <td>4</td>
+            </tr>
+            <tr>
+                <td>1</td>
+                <td>2</td>
+                <td>3</td>
+                <td>4</td>
+            </tr>
+        </tbody>
+    </table>
+    <div id="table--content">
+
+    </div>
+</body>
+<script>
+    const btn = document.querySelector("#clipboardBtn");
+    // btn.addEventListener("click",(e)=>{
+    //     const input = document.querySelector("#clipboard");
+    //     window.navigator.clipboard.writeText(input.value)
+    //     .then(data=>{
+    //         console.log(data)
+    //     })
+    // })
+
+    (async function(){
+        const toDos = await getToDos();
+        const table = createTable(toDos);
+        document.querySelector("#table--content").append(table);
+    }());
+    
+    async function getToDos(){
+        const todos = await (await fetch("https://jsonplaceholder.typicode.com/todos")).json();
+        return todos;
+    }
+
+    function createTable(toDos){
+        const table = document.createElement("table");
+        table.setAttribute("border",1);
+        table.append(createTableHeader(toDos[0]));
+        table.append(createTableBody(toDos));
+        
+        return table;
+
+        function createTableHeader(toDo){
+            const thead = document.createElement("thead");
+            const tr = document.createElement("tr");
+
+            Object.keys(toDo).forEach(key=>{
+                const th = document.createElement("th");
+                th.textContent = key;
+                tr.append(th);
+            });
+
+            thead.append(tr);
+
+            return thead;
+        }
+
+        function createTableBody(toDos){
+            const tbody = document.createElement("tbody");
+
+            toDos.forEach(toDo=>{
+                const tr = document.createElement("tr");
+                const values = Object.values(toDo);
+                values.forEach(value=>{
+                    const td = document.createElement("td");
+                    td.textContent = value;
+                    tr.append(td);
+                })
+                tbody.append(tr);
+            });
+
+            return tbody;
+        }
+    }
+</script>
+<script>
+
+    Object.prototype.isEmpty = function(){
+        return Object.keys(this).length===0;
+    }
+
+    class View{
+        static model = {
+            name : {}
+        };
+
+        static setModel(sName,oModel){
+            this.model.name[sName] = oModel;
+        }
+
+        static getModel(sName){
+            return this.model.name[sName];
+        }
+    }
+
+    class Binding{
+        constructor(object){
+            this.object = object;
+        }
+        bindingValues(obj){
+            for(let [key,value] of Object.entries(obj)){
+                const reg = new RegExp(/^{.*}$/g);
+                if(reg.test(value)){
+                    const text = value.replace("{","").replace("}","");
+                    const [model, path] = text.split(">");
+                    this[key] = View.getModel(model).getProperty(path);
+                    continue;
+                }
+                this[key] = value;
+            }            
+        }
+        getProperty(path){
+            const aPath = path.split("/").filter(p=>p);
+            let obj = this.object;
+            aPath.forEach(path=>{
+                obj = obj[path];
+            });
+            return obj;
+        }
+        setProperty(path, value){
+            const aPath = path.split("/").filter(p=>p);
+            let obj = this.object;
+            let sPath;
+            aPath.forEach((path,length)=>{
+                if(aPath.length-1 === length){
+                    sPath = path;
+                    return;
+                }
+                obj = obj[path];
+            });
+            obj[sPath] = value;
+            return true;
+        }
+    }
+
+    class CustomObject{
+        placeAt(sClass){
+            const node = document.querySelector(`${sClass}`);
+            node.append(this.render());
+        }
+    }
+    
+    class ManagedObject extends CustomObject{
+        setProperty(sPropertyName, value){
+            if(this.updateModelProperty(sPropertyName,value,this[sPropertyName])){
+                let oProperties = this.property;
+                oProperties[sPropertyName] = value;
+                this[sPropertyName] = value;
+            }
+        }
+        updateModelProperty(sPropertyName,value,oldValue){
+            const oBindingInfo = this.bindingInfo;
+            if(!oBindingInfo.isEmpty() && value!==oldValue){
+                return View.getModel(oBindingInfo[sPropertyName].modelName).setProperty(oBindingInfo[sPropertyName].path,value);                
+            }
+            return false;
+        }
+    }
+
+    class Element extends ManagedObject{
+        static id = "text_";
+        static num = 0;
+        static createId(){
+            return this.id+this.num++;
+        }
+        constructor(...args){
+            super(...args);
+            if(!args.id){
+                this.id = Element.createId();
+                return;
+            }    
+            this.id = id;
+        }
+        getId(){
+            return this.id;
+        }
+        setProperty(sPropertyName, value){            
+            super.setProperty.bind(this)(sPropertyName,value);
+        }
+    }
+
+    class Control extends Element{
+        constructor(...args){
+            super(...args);
+            this.bindingValues(...args);
+            //this._property = args;
+        }
+        bindingValues(obj){
+            this.bindingInfo = {};
+            this.property = {};
+            for(let [key,value] of Object.entries(obj)){
+                const reg = new RegExp(/^{.*}$/g);
+                if(reg.test(value)){
+                    const text = value.replace("{","").replace("}","");
+                    const [modelName, path] = text.split(">");
+                    const realValue = View.getModel(modelName).getProperty(path);
+                    this.property[key] = realValue;
+                    this[key] = realValue;
+                    this.bindingInfo[key] = {
+                        path,
+                        modelName
+                    }
+                    continue;              
+                }
+                this[key] = value;
+                this.property[key] = value;                
+            }            
+        }
+    }    
+    
+    class Text extends Control{
+        constructor(...args){
+            super(...args);
+        }
+        render(){
+            const div = document.createElement("div");
+            div.id = this.getId();
+            div.style.width = this.width;
+
+            const span = document.createElement("span");
+            span.id = this.getId()+"__inner";
+           
+            span.innerText = this.text;
+            
+            div.append(span);
+            return div;
+        }
+        getText(){
+            return this.text;
+        }
+        setText(sText){
+            if(this.text!==sText){
+                const span = document.getElementById(this.getId()+"__inner");
+                span.innerText = sText;
+            }
+            this.setProperty("text",sText);
+            return this;
+        } 
+    }
+    
+    const binding = new Binding({
+        name : "joga"
+    });
+
+    View.setModel("ViewModel",binding);
+    
+    const text = new Text({
+        text : "{ViewModel>/name}",
+        width : "30px"
+    });
+
+    text.placeAt("body");
+    window.framework = {
+        content : [
+            text
+        ],
+        getId : function(id){
+            return this.content.find(control=>control.id===id)
+        }
+    }
+</script>
+</html>
