@@ -313,7 +313,7 @@
         constructor(...args){
             super(...args);
             this.initControl(...args);
-            //this._property = args;
+            CustomFrameWork.addViewContainer(this);
         }
         initControl(obj){
             this.bindingInfo = {};
@@ -359,9 +359,9 @@
             const sControllerName = args[0].getControllerName();
             if(sControllerName){
                 this.controller = CustomFrameWork.getController(sControllerName);
+                this.controller.setView(this);
             }
             this.content = args[0].createContent(this.controller);
-            CustomFrameWork.addViewContainer(this.content);
         }
         getViewName(){
             return this.viewName;
@@ -373,6 +373,9 @@
         }
         getContent(){
             return this.content;
+        }
+        getController(){
+            return this.controller;
         }
     }
     
@@ -441,7 +444,16 @@
 
     class Controller{
         constructor(...args){
-            CustomFrameWork.addControllerContainer(args[0]);
+            for(const key in args[0]){
+                this[key] = args[0][key];
+            }
+            CustomFrameWork.addControllerContainer(this);
+        }
+        getView(){
+            return this.oView;
+        }
+        setView(oView){
+            this.oView = oView;
         }
     }
     
