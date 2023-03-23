@@ -138,68 +138,135 @@
         return Object.keys(this).length===0;
     }
 
-    class View{
-        static model = {
-            name : {}
-        };
+    // class View{
+    //     static model = {
+    //         name : {}
+    //     };
 
-        static setModel(sName,oModel){
-            this.model.name[sName] = oModel;
+    //     static setModel(sName,oModel){
+    //         this.model.name[sName] = oModel;
+    //     }
+
+    //     static getModel(sName){
+    //         return this.model.name[sName];
+    //     }
+    // }
+
+    class Model{
+        constructor(oData){
+            this.oData = oData;
         }
 
-        static getModel(sName){
-            return this.model.name[sName];
-        }
-    }
-
-    class Binding{
-        constructor(object){
-            this.object = object;
-        }
-        bindingValues(obj){
-            for(let [key,value] of Object.entries(obj)){
-                const reg = new RegExp(/^{.*}$/g);
-                if(reg.test(value)){
-                    const text = value.replace("{","").replace("}","");
-                    const [model, path] = text.split(">");
-                    this[key] = View.getModel(model).getProperty(path);
-                    continue;
-                }
-                this[key] = value;
-            }            
-        }
-        getProperty(path){
-            const aPath = path.split("/").filter(p=>p);
-            let obj = this.object;
+        getProperty(sPath){
+            const aPath = sPath.split("/").filter(p=>p);
+            let oData = this.oData;
             aPath.forEach(path=>{
-                obj = obj[path];
+                oData = oData[path];
             });
-            return obj;
+            return oData;
         }
-        setProperty(path, value){
-            const aPath = path.split("/").filter(p=>p);
-            let obj = this.object;
-            let sPath;
+        setProperty(sPath, value){
+            const aPath = sPath.split("/").filter(p=>p);
+            let oData = this.oData;
+            let sCurrentPath;
+
             aPath.forEach((path,length)=>{
                 if(aPath.length-1 === length){
-                    sPath = path;
+                    sCurrentPath = path;
                     return;
                 }
-                obj = obj[path];
+                oData = oData[path];
             });
-            obj[sPath] = value;
+
+            oData[sCurrentPath] = value;
             return true;
+        }
+
+    }
+    // class Binding{
+    //     constructor(object){
+    //         this.object = object;
+    //     }
+    //     // bindingValues(obj){
+    //     //     for(let [key,value] of Object.entries(obj)){
+    //     //         const reg = new RegExp(/^{.*}$/g);
+    //     //         if(reg.test(value)){
+    //     //             const text = value.replace("{","").replace("}","");
+    //     //             const [model, path] = text.split(">");
+    //     //             this[key] = View.getModel(model).getProperty(path);
+    //     //             continue;
+    //     //         }
+    //     //         this[key] = value;
+    //     //     }            
+    //     // }
+    //     getProperty(path){
+    //         const aPath = path.split("/").filter(p=>p);
+    //         let obj = this.object;
+    //         aPath.forEach(path=>{
+    //             obj = obj[path];
+    //         });
+    //         return obj;
+    //     }
+    //     setProperty(path, value){
+    //         const aPath = path.split("/").filter(p=>p);
+    //         let obj = this.object;
+    //         let sPath;
+    //         aPath.forEach((path,length)=>{
+    //             if(aPath.length-1 === length){
+    //                 sPath = path;
+    //                 return;
+    //             }
+    //             obj = obj[path];
+    //         });
+    //         obj[sPath] = value;
+    //         return true;
+    //     }
+    // }
+
+    class CustomFrameWork{
+        static viewContainer = [];
+        static addViewContainer(oControl){
+            CustomFrameWork.viewContainer.push(oControl);
+        }
+        static getId(id){
+            return CustomFrameWork.viewContainer.find(control=>control.id===id);
         }
     }
 
-    class CustomObject{
-        placeAt(sClass){
-            const node = document.querySelector(`${sClass}`);
-            node.append(this.render());
-        }
-    }
+    class CustomObject extends CustomFrameWork{}
     
     class ManagedObject extends CustomObject{
+        constructor(...args){
+            super(...args);
+            this.oModel = {};
+            this.oPropagatedProperties = {
+                oModel : {}
+            };
+        }
+
+        getModel(sModelName){
+            if(!sModelName) return this.oModel[""];
+            return this.oModel[sModelName] || this.oPropagatedProperties.oModel[sModelName];
+        }
+
+        setModel(sModelName,oModel){
+            if(!oModel && sModelName instanceof Model){
+                this.oModel[""] = sModelName;
+                return;
+            }
+
+            if(oModel instanceof Model){
+                this.oModel[sModelName] = oModel;
+                if(this instanceof View){
+                    this.getContent().oPropagatedProperties.oModel[sModelName] = oModel;
+                    this.getContent().updateModel();
+                }
+                return;
+            }
+
+            throw new Error("Model 객체가 들어와야합니다.");
+        }
+
         setProperty(sPropertyName, value){
             if(this.updateModelProperty(sPropertyName,value,this[sPropertyName])){
                 let oProperties = this.property;
@@ -210,7 +277,8 @@
         updateModelProperty(sPropertyName,value,oldValue){
             const oBindingInfo = this.bindingInfo;
             if(!oBindingInfo.isEmpty() && value!==oldValue){
-                return View.getModel(oBindingInfo[sPropertyName].modelName).setProperty(oBindingInfo[sPropertyName].path,value);                
+                const oModel = this.oModel[oBindingInfo[sPropertyName].modelName] || this.oPropagatedProperties.oModel[oBindingInfo[sPropertyName].modelName];
+                return oModel.setProperty(oBindingInfo[sPropertyName].path,value);    
             }
             return false;
         }
@@ -224,11 +292,7 @@
         }
         constructor(...args){
             super(...args);
-            if(!args.id){
-                this.id = Element.createId();
-                return;
-            }    
-            this.id = id;
+            args.id ? this.id = id : this.id = Element.createId();
         }
         getId(){
             return this.id;
@@ -241,31 +305,68 @@
     class Control extends Element{
         constructor(...args){
             super(...args);
-            this.bindingValues(...args);
+            this.initControl(...args);
             //this._property = args;
         }
-        bindingValues(obj){
+        initControl(obj){
             this.bindingInfo = {};
             this.property = {};
+
             for(let [key,value] of Object.entries(obj)){
                 const reg = new RegExp(/^{.*}$/g);
                 if(reg.test(value)){
                     const text = value.replace("{","").replace("}","");
                     const [modelName, path] = text.split(">");
-                    const realValue = View.getModel(modelName).getProperty(path);
+                    const realValue = this.getModel(modelName)?.getProperty(path);
                     this.property[key] = realValue;
                     this[key] = realValue;
                     this.bindingInfo[key] = {
                         path,
                         modelName
-                    }
-                    continue;              
+                    };
+                    continue;
                 }
                 this[key] = value;
                 this.property[key] = value;                
             }            
         }
-    }    
+        updateModel(){
+            const oBindingInfo = this.bindingInfo;
+            for(let [sBindingKey, oModelPath] of Object.entries(oBindingInfo)){
+                const sPath = oModelPath.path;
+                const sModelName = oModelPath.modelName;
+                const sValue = this.oPropagatedProperties.oModel[sModelName].getProperty(sPath);
+                this[sBindingKey] = sValue;
+                this.property[sBindingKey] = sValue;
+            }
+        }
+        placeAt(sClass){
+            const node = document.querySelector(`${sClass}`);
+            node.append(this.render());
+        }
+    }
+
+    class View extends Control{
+        constructor(...args){
+            super(...args);
+            this.content = args[0].createContent();
+            CustomFrameWork.addViewContainer(this.content);
+        }
+        getViewName(){
+            return this.viewName;
+        }
+        createContent(){
+            // if(arguments.length>1) throw new Error("content는 1개만 들어올 수 있습니다.");
+        }
+        render(){
+            const div = document.createElement("div");
+            div.append(this.content.render()); 
+            return div;
+        }
+        getContent(){
+            return this.content;
+        }
+    }
     
     class Text extends Control{
         constructor(...args){
@@ -291,31 +392,31 @@
             if(this.text!==sText){
                 const span = document.getElementById(this.getId()+"__inner");
                 span.innerText = sText;
+                this.setProperty("text",sText);
             }
-            this.setProperty("text",sText);
             return this;
         } 
     }
     
-    const binding = new Binding({
+    const oModel = new Model({
         name : "joga"
     });
 
-    View.setModel("ViewModel",binding);
-    
-    const text = new Text({
-        text : "{ViewModel>/name}",
-        width : "30px"
-    });
-
-    text.placeAt("body");
-    window.framework = {
-        content : [
-            text
-        ],
-        getId : function(id){
-            return this.content.find(control=>control.id===id)
+    const oView = new View({
+        viewName : "CustomFrameWork",
+        createContent : function(){
+            const text = new Text({
+                text : "{ViewModel>/name}",
+                width : "30px"
+            })
+            return text;
         }
-    }
+    });
+    
+    oView.setModel("ViewModel",oModel);
+
+    oView.placeAt("body");
+
+    window.framework = CustomFrameWork;
 </script>
 </html>
