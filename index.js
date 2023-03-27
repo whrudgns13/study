@@ -1,10 +1,10 @@
 import {Model,Controller,View,Text,Button} from "./CustomFrameWorkModule.js";
-console.log(Model);
+
 const oModel = new Model({
     name : "joga"
 });
 
-const oController = new Controller({
+new Controller({
     name : "CustomFrameWork.Controller",
     onInit : function(){
 
@@ -21,6 +21,7 @@ const oView = new View({
     },
     createContent : function(oController){
         const text = new Text({
+            
             text : "{ViewModel>/name}",
             width : "30px"
         })
